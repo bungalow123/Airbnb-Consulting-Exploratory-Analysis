@@ -1,0 +1,106 @@
+---
+title: "Airbnb Exploratory Analysis"
+author: "Eddie Liu, Gabriel Roth, Edward Lara, Shuangning Yang"
+date: "December 1, 2019"
+output:
+  html_document: default
+  pdf_document: default
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+
+# Introduction and Research Objective
+
+AirBNB's website contains a collection of datasets that summarize its users' listings internationally. Our group decided to narrow our focus on the listings dataset of the greater Los Angeles area because we are interested in analyzing possible factors that affect the rental prices. Because there is information for over 200 neighorhoods, we looked at the rentals of the major cities in western Los Angeles as this area encompasses UCLA. We decided to examine if the room type and location, described as neighborhood in the dataset, affect the price of a listing, and if so how they affect the price of a listing. We start off by visualizing the relationships between these variables in order to identify any patterns. Using a multiple linear regression model, we attempt to quantify the significance of the variables of interest in terms of a prediction standpoint. 
+
+
+# Visualizations
+
+```{r, fig.align='center', fig.height=6, fig.width = 12, warning=F, message=F}
+listings <- read.csv("airbnb.csv", header = T)
+vec <- c('Culver City', 'Beverly Hills', 'Santa Monica', 'Malibu', 'West Hollywood', 'Westwood', 'Westchester', 'Venice', 'Sawtelle', 'Century City')
+dat <- listings[which(listings$neighbourhood %in% vec), ] 
+dat <- dat[, -c(1, 2, 3, 4, 5, 7, 8, 12, 13, 14, 15, 16)]
+require(ggplot2)
+h <- ggplot(data = dat, mapping = aes(y = log(price), x = neighbourhood, color = room_type)) + geom_point() + ggtitle("Price for Each Room Type and Neighborhood") + ylab("Log(Price)") + xlab("Neighborhood") + theme(plot.title = element_text(hjust = 0.5)) + labs(color='Room Type') + 
+  geom_point() +
+  stat_summary(
+    geom = "point",
+    fun.y = "mean",
+    col = "black",
+    size = 3,
+    shape = 24,
+    fill = "red")
+plot(h)
+```
+
+Here we measure the Log of the Price variable in order to better visualize the scale of the prices. From the start, we see that in the West Los Angeles area, Malibu has the highest average listing price regardless of room type. Westchester on the other has the lowest average listing price. Examining room type, we see that entire homes/ apts dominate the higher price ranges while shared rooms mainly occupy the lower price ranges. Hotel rooms seem to rank right after entire homes/ apts followed by private rooms. 
+
+
+```{r, warning=F, message=F, fig.height = 6, fig.width = 9, fig.align='left'}
+library(reshape2)
+library(dplyr)
+ggplot(data = reshape2::melt(dat), aes(x = room_type, y = log(value))) + 
+  geom_point() + ylab("Log(Price)") + xlab("Room Type") + theme(plot.title = element_text(hjust = 0.5)) + ggtitle("Price for Each Room Type") + 
+  stat_summary(
+    geom = "point",
+    fun.y = "mean",
+    col = "black",
+    size = 3,
+    shape = 24,
+    fill = "red")
+```
+
+In this plot, we reaffirm our observations earlier about pricing by room type. It is important to note that there is a bit of variation with each room type, most notably with Hotel rooms and Shared rooms. 
+
+```{r, fig.align='center', fig.height=6, fig.width = 12, warning=F, message=F}
+
+ggplot(dat, aes(x = minimum_nights, y = log(price), color = room_type)) + geom_point() + xlab("Minimum Number of Nights") + ylab("Log(Price)") + ggtitle("Relationship Between Minimum Number of Nights and Price") + labs(colour = "Room Type") + theme(plot.title = element_text(hjust = 0.5))
+```
+
+Here we examine the Minimum Number of Nights against the price. Most listings have a minimum number of nights below 50. We hypothesize that the values above 50 are outliers and may be due to user inputted errors. The graph here does not seem to indicate a clear trend between these two variables.
+
+```{r, fig.align='center', fig.height=6, fig.width = 12, warning=F, message=F}
+
+ggplot(dat, aes(x = minimum_nights, y = log(price), color = room_type)) + geom_point() + xlab("Minimum Number of Nights") + ylab("Log(Price)") + ggtitle("Relationship Between Minimum Number of Nights and Price") + labs(colour = "Room Type") + theme(plot.title = element_text(hjust = 0.5)) + xlim(0,50)
+```
+
+Here we take a look at all entires that have a Minimum Number of Nights under 50. There again does not seem to be a clear trend. 
+
+```{r, fig.align='center', fig.height=6, fig.width = 12, warning=F, message=F}
+library(ggpubr)
+airbnb <- listings
+dat$lprice <- log(dat$price)
+ggscatter(dat, x = "minimum_nights", y = "lprice", add = "reg.line", conf.int = TRUE, cor.coef = TRUE, cor.method = "pearson", xlab = "Minimum Number of Nights", ylab = "Log(Price)") + ggtitle("Pearson Correlation Test") + theme(plot.title = element_text(hjust = 0.5)) + xlim(0,50)
+
+```
+
+The Pearson Correlation Test results indicate that there is a very slight (almost negligible) negative correlation between Log(Price) and Minimum Number of Nights. Although this is very slight, a possible reason for this may due to the risk associated with a higher minimum number of nights. These listings have less flexibility and thus may require less of a price as compensation for the lowered flexibility.
+
+# R Code for Analysis
+
+```{r}
+dat2 <- dat[, -2]
+dat2 <- dat2[-c(3174, 3595, 3606, 3744), ]
+dat2$price <- log(dat2$price)
+```
+
+
+```{r}
+dat2 %>% group_by(neighbourhood) %>% summarise_all(mean)
+dat <- dat[-c(3174, 3595, 3606, 3744), ]
+anova(lm(price~neighbourhood+room_type, data = dat))
+print(summary(lm(log(price)~neighbourhood+room_type, data = dat)))
+```
+
+
+# Results
+
+The tibble displayed at the top of the analysis summarises the mean price and minimum nights by each neighbourhood. Malibu has the highest average price per listing but it has the lowest amount of minimum nights required. This could relate to the added flexibility from having a lower amount of minimum nights dictating a higher price range. From the ANOVA table, the p-value of 0 suggests that the overall model is significant. In particular, the type of neighborhood and room type are significant in predicting the price of a listing. Furthermore, the summary of the log-linear model specifies that each city is significant in predicting the price. The type of room was only signifiant if it was a private or shared room. Although our R-squared value of 0.4146 is relatively small, it is clear that the two predictors do a good job of explaining part of the variation in price which is important for owners deciding how much to price their listing(s). 
+
+
+# Summary
+
+Our group was interested in AirBNB's Los Angeles dataset and wanted to determine if certain variables could predict the price of a given rental. Specifically, we examined the variables neighborhood and type of room. We created graphics to visualize the difference of price per room type and price difference per neighborhood. There seemed to be a difference in price based on each of these variables, so we analyzed the data numerically and found that both were significant. From our third graphic, we concluded that there did not seem to be a significant relationship between the price and the minimum number of nights required for a listing, but we did see that room type and price were correlated with entire homes/ apartments costing more on average. From our analyses, we recommend that owners who wish to post listings in any of the above areas examine the average price by location, as this factor is very important in determining the price of a listing. This is especially important with Malibu, as prices in this location tend to stray further from the prices of other locations. 
